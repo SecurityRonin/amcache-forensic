@@ -161,8 +161,27 @@ pub fn parse_bytes(bytes: &[u8]) -> Result<Amcache, AmcacheError> {
 fn read_legacy_file_entries(
     root_file: &Key<'_, Hive<Cursor<Vec<u8>>>>,
 ) -> Result<Vec<AmcacheFileEntry>, AmcacheError> {
-    let _ = root_file; // RED stub
-    Ok(Vec::new())
+    let mut out = Vec::new();
+    for volume in root_file.subkeys()? {
+        for sk in volume.subkeys()? {
+            let full_path = str_value(&sk, "15");
+            let name = full_path.as_deref().map(base_name);
+            out.push(AmcacheFileEntry {
+                key_name: sk.name(),
+                name,
+                full_path,
+                sha1: str_value(&sk, "101").and_then(|id| sha1_from_file_id(&id)),
+                program_id: str_value(&sk, "100"),
+                publisher: str_value(&sk, "1"),
+                version: None,
+                product_name: str_value(&sk, "0"),
+                binary_type: None,
+                size: None,
+                key_last_written_filetime: sk.last_written_raw(),
+            });
+        }
+    }
+    Ok(out)
 }
 
 /// The base name (last `\`/`/`-component) of a path.
