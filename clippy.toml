@@ -1,0 +1,9 @@
+# Allow `unwrap()`/`expect()` inside test functions and `#[cfg(test)]` modules.
+# Production code keeps `clippy::unwrap_used = deny` (see workspace Cargo.toml);
+# tests legitimately unwrap to fail loudly, so this is the upstream-recommended
+# exception rather than scattering `#[allow]` across every test module.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+
+# Windows-forensic / format names that look like code identifiers to doc_markdown.
+doc-valid-idents = ["Amcache", "InventoryApplicationFile", "InventoryDevicePnp", "InventoryApplication", "InventoryDeviceContainer", "FileId", "LongPathHash", "LowerCaseLongPath", "BinaryType", "ProgramId", "BusReportedDescription", "AmcacheParser", "AmcacheError", "dtformats", "regipy", "AppX", "PnP", "DFIRArtifactMuseum", "FILETIME", "WinXP", "dtfabric", "winreg-kb", "CFReDS", "DFIR", "SecurityRonin", "..", "SHA-1", "SHA-256", "MD5", "NTFS"]

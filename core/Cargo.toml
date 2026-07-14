@@ -1,0 +1,19 @@
+[package]
+name = "amcache-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Pure-Rust read-only Windows Amcache.hve reader — decodes the modern (Windows 10/11) InventoryApplicationFile execution-evidence entries (path, SHA-1, publisher, size, link date) and InventoryDevicePnp device entries from an Amcache hive."
+license.workspace = true
+authors.workspace = true
+keywords = ["forensics", "amcache", "windows", "dfir", "execution"]
+categories = ["parser-implementations"]
+repository.workspace = true
+readme.workspace = true
+exclude = ["tests/data/", "fuzz/"]
+
+[dependencies]
+winreg-core = { workspace = true }
+
+[lints]
+workspace = true
