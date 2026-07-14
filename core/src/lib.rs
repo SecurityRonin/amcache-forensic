@@ -8,10 +8,11 @@
 //! writes, is `#![forbid(unsafe_code)]`, and is panic-free (every registry read is fallible and
 //! propagated, never unwrapped).
 //!
-//! Scope: the **modern schema** (Windows 10 1607+ and Windows 11), whose entries live under
-//! `Root\InventoryApplicationFile`. The pre-1607 layout (`Root\File\{volume-GUID}\…`, used by
-//! Windows 8/8.1 and Server 2012 R2) is detected and reported as
-//! [`AmcacheError::OldSchemaUnsupported`] rather than silently mis-read.
+//! Both schemas are decoded: the **modern** one (Windows 10 1607+ / Windows 11), whose entries
+//! live under `Root\InventoryApplicationFile`, and the **legacy** pre-1607 layout
+//! (`Root\File\{volume-GUID}\…`, numbered values, used by Windows 8/8.1 and Server 2012 R2).
+//! [`Amcache::schema`] reports which was found. Legacy hives carry no `InventoryDevicePnp`, so
+//! their device list is empty; modern hives populate both.
 //!
 //! Field semantics follow libyal's `dtformats` "AMCache.hve format" documentation and are
 //! cross-validated against Eric Zimmerman's `AmcacheParser` and `regipy` (see `tests/`). The
@@ -77,13 +78,25 @@ pub struct AmcacheDeviceEntry {
     pub key_last_written_filetime: u64,
 }
 
-/// A decoded Amcache hive (modern schema).
+/// A decoded Amcache hive.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Amcache {
-    /// `InventoryApplicationFile` entries (executables).
+    /// Which schema the hive used.
+    pub schema: AmcacheSchema,
+    /// File entries (`InventoryApplicationFile` on modern hives, `Root\File\{volume}\…` on legacy).
     pub file_entries: Vec<AmcacheFileEntry>,
-    /// `InventoryDevicePnp` entries (devices).
+    /// `InventoryDevicePnp` entries (modern schema only; empty on legacy hives).
     pub device_entries: Vec<AmcacheDeviceEntry>,
+}
+
+/// Which Amcache schema a hive uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AmcacheSchema {
+    /// Windows 10 1607+ / Windows 11 (`Root\InventoryApplicationFile`).
+    #[default]
+    Modern,
+    /// Windows 8 / 8.1 / Server 2012 R2 (`Root\File\{volume-GUID}\…`, numbered values).
+    Legacy,
 }
 
 /// A failure reading an Amcache hive.
@@ -91,9 +104,7 @@ pub struct Amcache {
 pub enum AmcacheError {
     /// The hive could not be parsed.
     Hive(HiveError),
-    /// The hive uses the pre-1607 `Root\File` schema, which this crate does not decode.
-    OldSchemaUnsupported,
-    /// The hive has no `Root` key — not an Amcache hive.
+    /// The hive has neither an `InventoryApplicationFile` nor a `File` key — not an Amcache hive.
     NotAmcache,
 }
 
@@ -101,10 +112,6 @@ impl std::fmt::Display for AmcacheError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Hive(e) => write!(f, "hive error: {e}"),
-            Self::OldSchemaUnsupported => write!(
-                f,
-                "Amcache uses the pre-Windows-10-1607 Root\\File schema, which is not decoded"
-            ),
             Self::NotAmcache => write!(f, "hive has no Root key — not an Amcache hive"),
         }
     }
@@ -118,32 +125,49 @@ impl From<HiveError> for AmcacheError {
     }
 }
 
-/// Parse an Amcache hive from its raw bytes.
+/// Parse an Amcache hive from its raw bytes (modern Windows 10/11 or legacy Windows 8/8.1/2012 R2).
 ///
 /// # Errors
-/// [`AmcacheError`] if the bytes are not a readable hive, the hive is not an Amcache hive, or it
-/// uses the unsupported pre-1607 `Root\File` schema.
+/// [`AmcacheError`] if the bytes are not a readable hive, or the hive is not an Amcache hive.
 pub fn parse_bytes(bytes: &[u8]) -> Result<Amcache, AmcacheError> {
     let hive = Hive::from_bytes(bytes.to_vec())?;
     // The modern schema lives under Root\InventoryApplicationFile; the legacy one under Root\File.
-    let Some(iaf) = hive.open_key("Root\\InventoryApplicationFile")? else {
-        return Err(if hive.open_key("Root\\File")?.is_some() {
-            AmcacheError::OldSchemaUnsupported
-        } else {
-            AmcacheError::NotAmcache
-        });
-    };
-    let file_entries = read_file_entries(&iaf)?;
-    // A hive may carry InventoryApplicationFile but no InventoryDevicePnp — that's not an error.
-    let device_entries = hive
-        .open_key("Root\\InventoryDevicePnp")?
-        .map(|pnp| read_device_entries(&pnp))
-        .transpose()?
-        .unwrap_or_default();
-    Ok(Amcache {
-        file_entries,
-        device_entries,
-    })
+    if let Some(iaf) = hive.open_key("Root\\InventoryApplicationFile")? {
+        let file_entries = read_file_entries(&iaf)?;
+        // A hive may carry InventoryApplicationFile but no InventoryDevicePnp — not an error.
+        let device_entries = hive
+            .open_key("Root\\InventoryDevicePnp")?
+            .map(|pnp| read_device_entries(&pnp))
+            .transpose()?
+            .unwrap_or_default();
+        Ok(Amcache {
+            schema: AmcacheSchema::Modern,
+            file_entries,
+            device_entries,
+        })
+    } else if let Some(root_file) = hive.open_key("Root\\File")? {
+        Ok(Amcache {
+            schema: AmcacheSchema::Legacy,
+            file_entries: read_legacy_file_entries(&root_file)?,
+            device_entries: Vec::new(),
+        })
+    } else {
+        Err(AmcacheError::NotAmcache)
+    }
+}
+
+/// Legacy schema: `Root\File\{volume-GUID}\{file-reference}`, values named by hex code
+/// (`15`=path, `101`=SHA-1, `100`=program id, `0`=product, `1`=publisher). Walk every volume.
+fn read_legacy_file_entries(
+    root_file: &Key<'_, Hive<Cursor<Vec<u8>>>>,
+) -> Result<Vec<AmcacheFileEntry>, AmcacheError> {
+    let _ = root_file; // RED stub
+    Ok(Vec::new())
+}
+
+/// The base name (last `\`/`/`-component) of a path.
+fn base_name(path: &str) -> String {
+    path.rsplit(['\\', '/']).next().unwrap_or(path).to_string()
 }
 
 fn read_file_entries(

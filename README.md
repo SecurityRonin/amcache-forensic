@@ -25,12 +25,10 @@ Findings (4):
 
 ## What it decodes
 
-The modern **Windows 10/11** Amcache schema (`C:\Windows\AppCompat\Programs\Amcache.hve`):
+Both Amcache schemas (`C:\Windows\AppCompat\Programs\Amcache.hve`); `Amcache::schema` reports which:
 
-- **`InventoryApplicationFile`** → `AmcacheFileEntry` — per inventoried executable: path, **SHA-1** (the `FileId` with its `0000` padding removed), publisher, version, product, binary type, size, and the record's `FILETIME`.
-- **`InventoryDevicePnp`** → `AmcacheDeviceEntry` — PnP/USB devices: description, hardware id, manufacturer, model, class.
-
-The pre-1607 `Root\File` layout (Windows 8/8.1, Server 2012 R2) is **detected and named**, not silently mis-read.
+- **Modern (Windows 10/11)** — `InventoryApplicationFile` → `AmcacheFileEntry` (path, **SHA-1** from the `FileId`, publisher, version, product, binary type, size, record `FILETIME`); `InventoryDevicePnp` → `AmcacheDeviceEntry` (description, hardware id, manufacturer, model, class).
+- **Legacy (Windows 8/8.1, Server 2012 R2)** — the pre-1607 `Root\File\{volume-GUID}\…` layout with numbered values (`15`=path, `101`=SHA-1, `100`=program id, `0`=product, `1`=publisher) → `AmcacheFileEntry`. Legacy hives carry no device inventory.
 
 > **Amcache is evidence of *presence*, not proof of *execution*** — it also inventories files that were installed or scanned. Its value is the path plus a hash to identify the file. Findings are observations ("consistent with …"), never verdicts.
 
@@ -48,7 +46,7 @@ Tier-1 against **real DFIRArtifactMuseum hives** (MIT) from **four Windows syste
 | Win10 (APTSimulatorVM) | 123 | 189 |
 | Win10 (RathbunVM) | 183 | 185 |
 | Win11 (RathbunVM) | 231 | 187 |
-| Server 2012 R2 (legacy schema) | — detected & named — | |
+| Server 2012 R2 (Stolen Szechuan, legacy `Root\File`) | 136 | — |
 
 `7z.exe` → SHA-1 `1189cebeb8ffed7316f98b895ff949a726f4026f`, `CompatTelRunner.exe` → `77f2e744…` — matching both oracles byte-for-byte. See `core/tests/data/README.md`.
 

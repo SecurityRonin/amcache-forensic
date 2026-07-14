@@ -20,7 +20,7 @@ fn file(path: &str, sha1: Option<&str>) -> AmcacheFileEntry {
 fn amcache_of(files: Vec<AmcacheFileEntry>) -> Amcache {
     Amcache {
         file_entries: files,
-        device_entries: Vec::new(),
+        ..Default::default()
     }
 }
 

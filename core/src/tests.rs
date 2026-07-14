@@ -68,16 +68,25 @@ fn win10_device_entries_carry_a_description() {
 }
 
 #[test]
-fn legacy_root_file_schema_is_named_not_mis_read() {
-    // The Server 2012 R2 hive uses the pre-1607 Root\File schema.
-    match parse_bytes(OLD_2012R2) {
-        Err(AmcacheError::OldSchemaUnsupported) => {}
-        other => panic!("expected OldSchemaUnsupported, got {other:?}"),
-    }
-    assert!(parse_bytes(OLD_2012R2)
-        .unwrap_err()
-        .to_string()
-        .contains("Root\\File"));
+fn legacy_root_file_schema_decodes() {
+    // The Server 2012 R2 hive uses the pre-1607 Root\File schema — 136 file entries across
+    // volumes (AmcacheParser + regipy agree), no device entries.
+    let am = parse_bytes(OLD_2012R2).unwrap();
+    assert_eq!(am.schema, AmcacheSchema::Legacy);
+    assert_eq!(am.file_entries.len(), 136);
+    assert!(am.device_entries.is_empty());
+    // C:\Windows\System32\vm3dservice.exe → SHA-1 (FileId 0000f0032dfb… last-40), oracle-matched.
+    let e = am
+        .file_entries
+        .iter()
+        .find(|e| e.full_path.as_deref() == Some(r"C:\Windows\System32\vm3dservice.exe"))
+        .expect("vm3dservice.exe");
+    assert_eq!(e.name.as_deref(), Some("vm3dservice.exe"));
+    assert_eq!(
+        e.sha1.as_deref(),
+        Some("f0032dfb7e5d67dd10568e61787a4a3032ff55f5")
+    );
+    assert!(e.program_id.is_some());
 }
 
 #[test]
