@@ -124,8 +124,26 @@ impl From<HiveError> for AmcacheError {
 /// [`AmcacheError`] if the bytes are not a readable hive, the hive is not an Amcache hive, or it
 /// uses the unsupported pre-1607 `Root\File` schema.
 pub fn parse_bytes(bytes: &[u8]) -> Result<Amcache, AmcacheError> {
-    let _ = bytes; // RED stub
-    Ok(Amcache::default())
+    let hive = Hive::from_bytes(bytes.to_vec())?;
+    // The modern schema lives under Root\InventoryApplicationFile; the legacy one under Root\File.
+    let Some(iaf) = hive.open_key("Root\\InventoryApplicationFile")? else {
+        return Err(if hive.open_key("Root\\File")?.is_some() {
+            AmcacheError::OldSchemaUnsupported
+        } else {
+            AmcacheError::NotAmcache
+        });
+    };
+    let file_entries = read_file_entries(&iaf)?;
+    // A hive may carry InventoryApplicationFile but no InventoryDevicePnp — that's not an error.
+    let device_entries = hive
+        .open_key("Root\\InventoryDevicePnp")?
+        .map(|pnp| read_device_entries(&pnp))
+        .transpose()?
+        .unwrap_or_default();
+    Ok(Amcache {
+        file_entries,
+        device_entries,
+    })
 }
 
 fn read_file_entries(
