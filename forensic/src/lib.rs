@@ -69,8 +69,30 @@ pub fn analyze_bytes(bytes: &[u8]) -> Result<AmcacheReport, AmcacheError> {
 /// Audit a decoded Amcache for graded anomalies (may be empty).
 #[must_use]
 pub fn audit(amcache: &Amcache) -> Vec<AmcacheAnomaly> {
-    let _ = amcache; // RED stub
-    Vec::new()
+    let mut out = Vec::new();
+    for e in &amcache.file_entries {
+        let Some(path) = e.full_path.as_deref() else {
+            continue;
+        };
+        let name = base_name(path);
+        let upper = path.to_uppercase();
+        let in_system = upper.contains(r"\SYSTEM32\") || upper.contains(r"\SYSWOW64\");
+        if forensicnomicon::processes::is_system32_binary(&name) && !in_system {
+            out.push(AmcacheAnomaly::SystemBinaryRelocated {
+                name: name.to_uppercase(),
+                path: path.to_string(),
+                sha1: e.sha1.clone(),
+            });
+        }
+        if forensicnomicon::heuristics::paths::is_suspicious_exec_path(path) {
+            out.push(AmcacheAnomaly::SuspiciousPath {
+                name,
+                path: path.to_string(),
+                sha1: e.sha1.clone(),
+            });
+        }
+    }
+    out
 }
 
 /// The base name (last `\`/`/`-component) of a path.
