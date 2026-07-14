@@ -11,8 +11,8 @@
 ## Run it
 
 ```console
-$ cargo install amcache-forensic          # installs the amc4n6 binary
-$ amc4n6 /path/to/Amcache.hve
+$ cargo install amcache-forensic          # installs the amcache4n6 binary
+$ amcache4n6 /path/to/Amcache.hve
 Amcache: 123 file entries, 189 device entries
 Findings (4):
   [MEDIUM] AMCACHE-SUSPICIOUS-PATH  c:\users\testuser\downloads\sysmon\sysmon64.exe
@@ -37,7 +37,7 @@ The pre-1607 `Root\File` layout (Windows 8/8.1, Server 2012 R2) is **detected an
 ## Layers
 
 - **`amcache-core`** — `parse_bytes(&[u8]) -> Amcache`. Walks the hive with [`winreg-core`], `#![forbid(unsafe_code)]`, panic-free.
-- **`amcache-forensic`** — `analyze_bytes` + `audit` (graded `forensicnomicon` findings, each with the SHA-1 as a hash subject) and the `amc4n6` CLI.
+- **`amcache-forensic`** — `analyze_bytes` + `audit` (graded `forensicnomicon` findings, each with the SHA-1 as a hash subject) and the `amcache4n6` CLI.
 
 ## Validation
 

@@ -1,4 +1,4 @@
-//! `amc4n6` — read a Windows `Amcache.hve` and print the inventoried executables (path, `SHA-1`)
+//! `amcache4n6` — read a Windows `Amcache.hve` and print the inventoried executables (path, `SHA-1`)
 //! and PnP devices, plus graded findings.
 //!
 //! Decoding + analysis live in the `amcache_forensic` / `amcache_core` libraries; this binary
@@ -16,14 +16,14 @@ fn main() -> ExitCode {
     let files = args.iter().any(|a| a == "--files");
     let devices = args.iter().any(|a| a == "--devices");
     let Some(path) = args.iter().find(|a| !a.starts_with("--")) else {
-        eprintln!("usage: amc4n6 <Amcache.hve> [--files] [--devices]");
+        eprintln!("usage: amcache4n6 <Amcache.hve> [--files] [--devices]");
         return ExitCode::from(2);
     };
 
     let bytes = match std::fs::read(path) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("amc4n6: {path}: {e}");
+            eprintln!("amcache4n6: {path}: {e}");
             return ExitCode::FAILURE;
         }
     };
@@ -33,7 +33,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("amc4n6: {path}: {e}");
+            eprintln!("amcache4n6: {path}: {e}");
             ExitCode::FAILURE
         }
     }
