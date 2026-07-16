@@ -6,7 +6,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-h4x0r-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/h4x0r)
 
-**Prove what was on a Windows box — with a SHA-1 to pivot on — straight from `Amcache.hve`, on any OS.** A panic-free reader for the modern (Windows 10/11) Amcache schema plus an analyzer that flags masquerading and staging-directory execution, every finding carrying the file hash.
+**Prove what was on a Windows box — with a SHA-1 to pivot on — straight from `Amcache.hve`, on any OS.** A panic-free-by-construction reader for the modern (Windows 10/11) Amcache schema plus an analyzer that flags masquerading and staging-directory execution, every finding carrying the file hash.
 
 ## Run it
 
@@ -34,7 +34,7 @@ Both Amcache schemas (`C:\Windows\AppCompat\Programs\Amcache.hve`); `Amcache::sc
 
 ## Layers
 
-- **`amcache-core`** — `parse_bytes(&[u8]) -> Amcache`. Walks the hive with [`winreg-core`], `#![forbid(unsafe_code)]`, panic-free.
+- **`amcache-core`** — `parse_bytes(&[u8]) -> Amcache`. Walks the hive with [`winreg-core`], `#![forbid(unsafe_code)]`, panic-free by lint.
 - **`amcache-forensic`** — `analyze_bytes` + `audit` (graded `forensicnomicon` findings, each with the SHA-1 as a hash subject) and the `amcache4n6` CLI.
 
 ## Validation
